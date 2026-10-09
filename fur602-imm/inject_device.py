@@ -39,10 +39,10 @@ def main():
         open(mk, "w", encoding="utf-8").write(text)
         print("[ok] device block injected into filogic.mk")
 
-    # 3) 02_network
+    # 3) 02_network：网口（wan + lan1 lan2 lan3，与 jcg,q30-pro 同组）
     net = os.path.join(root, "target/linux/mediatek/filogic/base-files/etc/board.d/02_network")
     n = open(net, encoding="utf-8").read()
-    if "honor,fur-602" in n:
+    if "honor,fur-602|\\" in n:
         print("[skip] network entry already present")
     else:
         marker = "jcg,q30-pro|\\"
@@ -50,7 +50,30 @@ def main():
             raise SystemExit("FATAL: marker %r not found in 02_network" % marker)
         n = n.replace(marker, "\thonor,fur-602|\\\n" + marker, 1)
         open(net, "w", encoding="utf-8").write(n)
-        print("[ok] honor,fur-602 injected into 02_network")
+        print("[ok] honor,fur-602 injected into 02_network (interfaces)")
+
+    # 4) 02_network：MAC 来源
+    #    DTS 未定义 mac-address，若不在此指定，mediatek_setup_macs 无匹配分支，
+    #    base_mac 会退回 eth0（内核随机生成）=> 每次重启 MAC 变化。
+    #    写法照抄源码既有设备：yuncore,ax835 / mediatek,7981r128 均用
+    #    mtd_get_mac_binary Factory 0x4；此处 lan/wan 同用原值，不做 +1 偏移。
+    n = open(net, encoding="utf-8").read()
+    if "honor,fur-602)\n" in n:
+        print("[skip] mac entry already present")
+    else:
+        marker = "\tyuncore,ax835)\n"
+        if marker not in n:
+            raise SystemExit("FATAL: marker %r not found in 02_network (macs)" % marker)
+        block = (
+            "\thonor,fur-602)\n"
+            "\t\tlabel_mac=$(mtd_get_mac_binary Factory 0x4)\n"
+            "\t\tlan_mac=$label_mac\n"
+            "\t\twan_mac=$label_mac\n"
+            "\t\t;;\n"
+        )
+        n = n.replace(marker, block + marker, 1)
+        open(net, "w", encoding="utf-8").write(n)
+        print("[ok] honor,fur-602 injected into 02_network (macs)")
 
 
 if __name__ == "__main__":
