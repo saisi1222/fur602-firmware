@@ -1,0 +1,93 @@
+name: Build FUR-602 ImmortalWrt (24.10 / kernel 6.6)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-fur602-immortalwrt.yml'
+      - 'fur602-imm/**'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout build materials
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/lib/jvm 2>/dev/null || true
+          sudo apt-get clean || true
+          df -h || true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libncurses-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev \
+            file wget device-tree-compiler
+
+      - name: Clone ImmortalWrt source (openwrt-24.10-6.6, latest)
+        run: |
+          git clone --depth 1 -b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6.git openwrt
+          cd openwrt && git log -1 --format='HEAD=%H%ndate=%ad'
+
+      - name: Inject FUR-602 device support (DTS + device profile + network)
+        run: python3 fur602-imm/inject_device.py openwrt
+
+      - name: Add nft-fullcone package (kernel 6.6 fixed)
+        run: |
+          mkdir -p openwrt/package/nft-fullcone
+          cp -r fur602-imm/package/nft-fullcone/. openwrt/package/nft-fullcone/
+          ls -l openwrt/package/nft-fullcone/
+
+      - name: Add uci-defaults (LAN 192.168.110.1 + Wifi)
+        run: |
+          mkdir -p openwrt/files
+          cp -r fur602-imm/files/. openwrt/files/
+          chmod +x openwrt/files/etc/uci-defaults/*
+          ls -l openwrt/files/etc/uci-defaults/
+
+      - name: Configure (.config + feeds)
+        working-directory: openwrt
+        run: |
+          cp ../fur602-imm/config.seed .config
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+          make defconfig
+          echo "=== 关键包确认 ==="
+          grep -E "CONFIG_TARGET_DEVICE|kmod-nft-fullcone|zram-swap|autoreboot|luci-app-firewall|kmod-mediatek_hnat" .config || true
+
+      - name: Build
+        working-directory: openwrt
+        run: |
+          make -j$(nproc) download
+          make -j$(nproc)
+
+      - name: List images / check hnat
+        if: always()
+        working-directory: openwrt
+        run: |
+          ls -la bin/targets/mediatek/filogic/ 2>/dev/null || true
+          echo "=== hnat (硬件加速) 模块检查 ==="
+          find build_dir -name "*hnat*" 2>/dev/null | head -5 || true
+          grep -c "CONFIG_NET_MEDIATEK_HNAT" build_dir/target-aarch64_cortex-a53_musl/linux-mediatek_filogic/linux-*/.config 2>/dev/null || true
+
+      - name: Upload images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fur602-immortalwrt
+          path: openwrt/bin/targets/mediatek/filogic/*honor_fur-602*.bin
+          if-no-files-found: warn
+
+      - name: Diagnose on failure
+        if: failure()
+        working-directory: openwrt
+        run: |
+          echo "=== 磁盘 ==="
+          df -h || true
+          echo "=== 最近构建日志 ==="
+          ls -la logs 2>/dev/null || true
+          tail -n 150 /home/runner/work/fur602-firmware/fur602-firmware/openwrt/logs/*.log 2>/dev/null || true

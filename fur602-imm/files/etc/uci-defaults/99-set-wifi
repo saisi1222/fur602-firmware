@@ -1,0 +1,22 @@
+#!/bin/sh
+# 首次启动配置无线：双频默认开启、开放无密码、SSID FUR602_2G / FUR602_5G
+# 若无线配置尚未生成，先生成一份
+[ -s /etc/config/wireless ] || wifi config >/dev/null 2>&1
+
+for r in radio0 radio1; do
+  idx="${r#radio}"
+  uci -q set wireless.$r.disabled='0'
+  uci -q set wireless.$r.country='CN'
+  uci -q set wireless.default_$r.disabled='0'
+  if [ "$idx" = "0" ]; then
+    uci -q set wireless.default_$r.ssid='FUR602_2G'
+  else
+    uci -q set wireless.default_$r.ssid='FUR602_5G'
+  fi
+  uci -q set wireless.default_$r.encryption='none'
+  uci -q set wireless.default_$r.key=''
+  uci -q set wireless.default_$r.network='lan'
+done
+
+uci commit wireless
+exit 0

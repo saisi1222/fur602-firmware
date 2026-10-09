@@ -1,0 +1,9 @@
+CONFIG_TARGET_mediatek=y
+CONFIG_TARGET_mediatek_filogic=y
+CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_honor_fur-602=y
+CONFIG_PACKAGE_kmod-mediatek_hnat=y
+CONFIG_PACKAGE_kmod-nft-fullcone=y
+CONFIG_PACKAGE_zram-swap=y
+CONFIG_PACKAGE_luci-app-autoreboot=y
+CONFIG_PACKAGE_luci-app-firewall=y
+CONFIG_PACKAGE_luci=y
