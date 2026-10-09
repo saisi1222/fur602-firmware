@@ -55,19 +55,23 @@ jobs:
           else
             echo "immortalwrt-112m missing -> injecting the standard ImmortalWrt 112M layout (ubi@0x600000) into $DTS"
             python3 - <<'PY'
+          import re
           p="mt7981-honor_fur-602.dts"
           t=open(p,encoding='utf-8').read()
           block=(
-              "        layout@2 {\n"
-              "            label = \"immortalwrt-112m\";\n"
-              "            mtdids = \"nmbm0=nmbm0\";\n"
-              "            mtdparts = \"nmbm0:1024k(bl2),256k(Nvram),256k(Bdata),2048k(factory),2048k(fip),256k(crash),256k(crash_log),112m(ubi),256k(KF)\";\n"
-              "        };"
+              "\t\tlayout@2 {\n"
+              "\t\t\tlabel = \"immortalwrt-112m\";\n"
+              "\t\t\tmtdids = \"nmbm0=nmbm0\";\n"
+              "\t\t\tmtdparts = \"nmbm0:1024k(bl2),256k(Nvram),256k(Bdata),2048k(factory),2048k(fip),256k(crash),256k(crash_log),112m(ubi),256k(KF)\";\n"
+              "\t\t};"
           )
-          idx=t.rfind("\n};")
-          t=t[:idx]+"\n"+ "".join(block)+"\n"+t[idx:]
+          # insert layout@2 INSIDE the /mtd-layout node, right before its inner closing (1-tab) '};'
+          m=re.search(r'(/mtd-layout\s*\{.*?)\n\t\};', t, re.S)
+          if not m:
+              raise SystemExit("mtd-layout node not found in " + p)
+          t=t[:m.start()]+m.group(1)+"\n"+ "".join(block)+"\n\t};"+t[m.end():]
           open(p,'w',encoding='utf-8').write(t)
-          print("injected standard immortalwrt-112m layout")
+          print("injected standard immortalwrt-112m layout inside /mtd-layout")
           PY
           fi
           # hedge: also provide the underscore-named DTS copy so build.sh finds it under either naming convention
