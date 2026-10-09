@@ -83,7 +83,7 @@ jobs:
 
       - name: Build firmware
         working-directory: padavanonly
-        run: make -j$(nproc)
+        run: make -j$(nproc) V=s
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
