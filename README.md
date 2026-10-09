@@ -3,8 +3,8 @@
 基于 **padavanonly/immortalwrt-mt798x-6.6 @ `openwrt-24.10-6.6`** 编译包含以下特性的 FUR-602 固件：
 
 - **闭源 mtwifi 驱动**（`kmod-mt_wifi`，与现固件一致，含 HNAT/WARP）
-- **CPU 降频**（内核 `ARM_MEDIATEK_CPUFREQ=y` + 全部 governor 已在 filogic 子目标默认开启；固件内带 `cpufreq` / `luci-app-cpufreq`）
-- **全锥形 NAT（nft fullcone）**：用户态补丁 padavanonly 已自带（libnftnl / nftables / firewall4），内核模块 `kmod-nft-fullcone` 由 `fullcone-nat-nftables/nft-fullcone` feed 补齐
+- **CPU 频率**：MT7981 硬件**不支持 DVFS**（联发科移除动态节能，定频 1.3GHz、电压不动态升降，无 OPP 节点），因此"CPU 降频"在 FUR-602 上**物理不可实现**；编译产物**不含** `cpufreq` / `luci-app-cpufreq`。需要温度/散热管理请改用 `pwm-fan`（现固件 DTS 已带，`status=disabled`，可按需开启）。
+- **全锥形 NAT（nft fullcone）**：用户态补丁 padavanonly 已自带（libnftnl / nftables / firewall4）；内核模块 `kmod-nft-fullcone` 以**本地 vendor 包**形式放入 `package/kernel/nft-fullcone/`（上游仓库是单包目录、不能直接当 feed 用，故改为 vendor）
 - **FUR-602 设备支持**：DTS + device 段来自 Yuzhii0718 fork，已把 `kmod-mt7915e` 改为 `kmod-mt_wifi`
 
 > 设计依据（已在线核实）：padavanonly `feeds.conf.default` 只挂标准 feed，**不含**全锥；其 `nft.mk` 里没有 `kmod-nft-fullcone`（官方 immortalwrt 24.10 同样不含模块），所以必须靠外部 feed 补内核模块，而用户态补丁已在主源 `package/*/patches/` 就位。
@@ -15,7 +15,7 @@
 fur602-build/
 ├── .github/workflows/build-fur602.yml   # 完整固件编译 workflow
 ├── fur602-patches/
-│   ├── dts/mt7981b-honor-fur-602.dts     # FUR-602 设备树（来自 Yuzhii0718）
+│   ├── dts/mt7981b-honor-fur-602.dts     # FUR-602 设备树（从路由器运行期 DTB 反编译，最贴近真实硬件；含闭源 mtwifi 的 wifi@18000000 节点）
 │   ├── apply-device.py                   # 把设备定义注入 filogic.mk
 │   └── fur602.config                     # .config 种子（target/device/功能开关）
 ├── kernel.config                         # 路由器现跑内核配置（参考/对照用）
@@ -48,8 +48,8 @@ lsmod | grep nft_fullcone
 uci set firewall.@defaults[0].fullcone='1'; uci commit firewall; fw4 reload
 nft list ruleset | grep -i fullcone
 
-# 验证 cpufreq
-cpufreq-info            # 或 luci → 系统 → CPU 频率
+# 验证 CPU 频率（MT7981 定频，无 scaling 可用；确认当前主频即可）
+cat /sys/devices/system/cpu/cpu0/cpufreq/cpuinfo_cur_freq 2>/dev/null || grep -i bogo /proc/cpuinfo
 ```
 
 ## 注意

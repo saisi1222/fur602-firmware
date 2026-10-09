@@ -35,18 +35,21 @@ jobs:
           python3 fur602-build/fur602-patches/apply-device.py \
              padavanonly/target/linux/mediatek/image/filogic.mk
 
-      - name: Add nft fullcone kernel-module feed
+      - name: Add nft fullcone kernel module (vendored local package)
         run: |
-          echo "src-git fullcone https://github.com/fullcone-nat-nftables/nft-fullcone.git" \
-            >> padavanonly/feeds.conf.default
+          mkdir -p padavanonly/package/kernel/nft-fullcone
+          cp -r fur602-build/fur602-patches/nft-fullcone/. padavanonly/package/kernel/nft-fullcone/
+          test -f padavanonly/package/kernel/nft-fullcone/Makefile \
+            || { echo "ERROR: nft-fullcone Makefile missing"; exit 1; }
 
       - name: Update & install feeds
         working-directory: padavanonly
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
-          # 早暴露 fullcone feed 是否被正确识别（根目录单包 Makefile）
-          ls package/feeds/fullcone/ 2>/dev/null || { echo "ERROR: fullcone feed not picked up"; exit 1; }
+          # nft-fullcone 以本地包形式提供（非 feed），确认已就位
+          test -f package/kernel/nft-fullcone/Makefile \
+            || { echo "ERROR: nft-fullcone package not present"; exit 1; }
 
       - name: Configure (.config -> defconfig)
         working-directory: padavanonly
@@ -60,8 +63,8 @@ jobs:
       - name: Verify key selections (fail-fast)
         working-directory: padavanonly
         run: |
-          echo "--- DEVICE / fullcone / mtwifi / cpufreq in .config ---"
-          grep -E "DEVICE_honor_fur-602|kmod-nft-fullcone|kmod-mt_wifi|CONFIG_PACKAGE_cpufreq" .config || true
+          echo "--- DEVICE / fullcone / mtwifi in .config ---"
+          grep -E "DEVICE_honor_fur-602|kmod-nft-fullcone|kmod-mt_wifi" .config || true
           # 任一关键项未进入 .config 则立即中止，避免白编 2 小时
           for k in \
             CONFIG_TARGET_mediatek_filogic_DEVICE_honor_fur-602=y \
