@@ -37,6 +37,12 @@
 
 #include "nf_nat_fullcone.h"
 
+/* prandom_u32() 在 6.0 被移除，改名为 get_random_u32()。为兼容新旧内核加 shim。 */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 0, 0)
+#include <linux/random.h>
+#define prandom_u32() get_random_u32()
+#endif
+
 /*
  * FULLCONE_HKEY generates u32 hash value
  * Modified from net/netfilter/ipset/ip_set_hash_gen.h
