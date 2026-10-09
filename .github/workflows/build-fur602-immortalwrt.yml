@@ -56,14 +56,20 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
           make defconfig
+          # 兜底：必须选中一个 libustream 变体，否则打包期 opkg 会装不上（历史失败点）
+          if ! grep -q "^CONFIG_PACKAGE_libustream" .config; then
+            echo "[!] no libustream selected -> force openssl variant"
+            echo "CONFIG_PACKAGE_libustream-openssl20201210=y" >> .config
+            make defconfig
+          fi
           echo "=== 关键包确认 ==="
-          grep -E "CONFIG_TARGET_DEVICE|kmod-nft-fullcone|zram-swap|autoreboot|luci-app-firewall|kmod-mediatek_hnat" .config || true
+          grep -E "CONFIG_TARGET_DEVICE|kmod-nft-fullcone|zram-swap|autoreboot|luci-app-firewall|libustream|kmod-mt_wifi|nft-offload|mtwifi-cfg" .config || true
 
       - name: Build
         working-directory: openwrt
         run: |
           make -j$(nproc) download
-          make -j$(nproc)
+          make -j$(nproc) || make -j1 V=s
 
       - name: List images / check hnat
         if: always()
