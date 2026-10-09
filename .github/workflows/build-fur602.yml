@@ -45,6 +45,8 @@ jobs:
         run: |
           ./scripts/feeds update -a
           ./scripts/feeds install -a
+          # 早暴露 fullcone feed 是否被正确识别（根目录单包 Makefile）
+          ls package/feeds/fullcone/ 2>/dev/null || { echo "ERROR: fullcone feed not picked up"; exit 1; }
 
       - name: Configure (.config -> defconfig)
         working-directory: padavanonly
@@ -55,10 +57,19 @@ jobs:
           ./scripts/config -e NF_CONNTRACK_EVENTS -e NF_CONNTRACK_CHAIN_EVENTS
           make defconfig
 
-      - name: Verify key selections
+      - name: Verify key selections (fail-fast)
         working-directory: padavanonly
         run: |
-          grep -E "DEVICE_honor_fur-602|kmod-nft-fullcone|kmod-mt_wifi|cpufreq" .config || true
+          echo "--- DEVICE / fullcone / mtwifi / cpufreq in .config ---"
+          grep -E "DEVICE_honor_fur-602|kmod-nft-fullcone|kmod-mt_wifi|CONFIG_PACKAGE_cpufreq" .config || true
+          # 任一关键项未进入 .config 则立即中止，避免白编 2 小时
+          for k in \
+            CONFIG_TARGET_mediatek_filogic_DEVICE_honor_fur-602=y \
+            CONFIG_PACKAGE_kmod-nft-fullcone=y \
+            CONFIG_PACKAGE_kmod-mt_wifi=y ; do
+            grep -qxF "$k" .config || { echo "ERROR: missing $k"; exit 1; }
+          done
+          echo "OK: 关键选型均已进入 .config"
 
       - name: Download sources
         working-directory: padavanonly
