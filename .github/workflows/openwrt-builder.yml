@@ -67,11 +67,22 @@ jobs:
             #   覆盖后 Kconfig 与 defconfig 对不上，无线驱动会消失。两者都不拷。
             cp -af ./feeds/mtk_openwrt_feed/24.10/files/tools/. ./tools/ 2>/dev/null || true
             echo "[i] copied: 24.10/files/tools -> tools/ (xxhash)"
+            # 只应用 08xx（tools/sdk 类）。其余全部跳过，实测证据：
+            #   - files/target 里的 mt7988* dts/dtso 覆盖 -> 999-3027 Hunk FAILED（run 37964085004）
+            #   - patches-base/1002 往源码自带的 mt7988a-rfb-emmc.dtso 再插两组 fragment
+            #     -> dtc: ERROR (duplicate_node_names) /fragment@1（run 37969444155）
+            #   padavanonly 这份源码已把 MTK feed 内容整合进来（自带 package/mtk、files-6.6），
+            #   再叠 feed 的 dts/image 补丁必然重复。feed 只用来提供包定义。
             for file in $(find ./feeds/mtk_openwrt_feed/24.10/patches-base -name "*.patch" | sort); do
+              base=$(basename "$file")
+              case "$base" in
+                08*) ;;
+                *) echo "  [skip] 源码已整合，重复应用会破坏 dts/image: $base"; continue;;
+              esac
               if patch -p1 --dry-run --forward -i "$file" >/dev/null 2>&1; then
                 patch -p1 --forward -i "$file" >/dev/null && echo "  [ok]   $file" || echo "  [warn] $file"
               else
-                echo "  [skip] cannot apply cleanly: $file"
+                echo "  [skip] cannot apply cleanly: $base"
               fi
             done
           else
