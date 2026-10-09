@@ -179,9 +179,25 @@ static int nft_fullcone_init(const struct nft_ctx *ctx, const struct nft_expr *e
 	return err;
 }
 
+/*
+ * nft_expr_ops.dump signature changed upstream:
+ *   plain 6.6: int (*dump)(struct sk_buff *, const struct nft_expr *);
+ *   6.7+ / backported: int (*dump)(struct sk_buff *, const struct nft_expr *, bool reset);
+ * padavanonly's 6.6.133 tree carries the 3-arg variant, so default to it.
+ * Define NFT_DUMP_NO_RESET to build against a plain 2-arg kernel tree.
+ */
+#ifdef NFT_DUMP_NO_RESET
 static int nft_fullcone_dump(struct sk_buff *skb, const struct nft_expr *expr)
+#else
+static int nft_fullcone_dump(struct sk_buff *skb, const struct nft_expr *expr,
+			     bool reset)
+#endif
 {
 	const struct nft_fullcone *priv = nft_expr_priv(expr);
+
+#ifndef NFT_DUMP_NO_RESET
+	(void)reset;
+#endif
 
 	if (priv->flags != 0 && nla_put_be32(skb, NFTA_FULLCONE_FLAGS, htonl(priv->flags)))
 		goto nla_put_failure;

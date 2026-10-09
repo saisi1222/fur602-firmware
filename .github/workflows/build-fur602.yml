@@ -103,8 +103,16 @@ jobs:
         if: failure()
         working-directory: padavanonly
         run: |
-          # 只重编失败包并开 V=s，快速暴露真实 gcc/内核 API 报错，避免整编一小时盲猜
-          make package/kernel/nft-fullcone/compile V=s 2>&1 | tail -80 || true
+          # 1) 先把目标内核里 nft_expr_ops 的真实回调签名打出来（取证，避免下一轮再猜）
+          echo "===== kernel nft_expr_ops callback signatures ====="
+          H=$(find build_dir -path '*include/net/netfilter/nf_tables.h' 2>/dev/null | head -1)
+          echo "header: $H"
+          if [ -n "$H" ]; then
+            sed -n '/^struct nft_expr_ops {/,/^};/p' "$H" || true
+          fi
+          # 2) 只重编失败包并开 V=s，快速暴露真实 gcc/内核 API 报错，避免整编一小时盲猜
+          echo "===== rebuild failing package with V=s ====="
+          make package/kernel/nft-fullcone/compile V=s 2>&1 | tail -120 || true
           make package/kernel/nft-fullcone/compile V=s 2>&1 | grep -iE "error:|undefined|\.c:[0-9]+:[0-9]+" | head -40 || true
 
       - name: Upload firmware artifacts
