@@ -56,9 +56,12 @@ jobs:
         run: |
           cp ../fur602-build/fur602-patches/fur602.config .config
           make defconfig
-          # 确保 nft_fullcone 所需的内核选项为 y
-          ./scripts/config -e NF_CONNTRACK_EVENTS -e NF_CONNTRACK_CHAIN_EVENTS
-          make defconfig
+          # 注意: padavanonly 树里 scripts/config 是一个“目录”，不是 kconfig 包装脚本，
+          # 执行 ./scripts/config -e 会报 "Is a directory" (exit 126)。
+          # NF_CONNTRACK_EVENTS / NF_CONNTRACK_CHAIN_EVENTS 无需手工设置：
+          # nft-fullcone 包 Makefile 的 KCONFIG:= 会在编译内核时自动注入。
+          echo "--- 关键选型自检 ---"
+          grep -E "^CONFIG_TARGET_mediatek_filogic=|^CONFIG_TARGET_mediatek_filogic_DEVICE_honor_fur-602=|^CONFIG_PACKAGE_kmod-(nft-fullcone|mt_wifi)=|^CONFIG_NF_CONNTRACK_(CHAIN_)?EVENTS=" .config || true
 
       - name: Verify key selections (fail-fast)
         working-directory: padavanonly
