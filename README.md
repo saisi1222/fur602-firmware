@@ -1,53 +1,60 @@
-# 给 HONOR FUR-602 编译 nft_fullcone.ko（GitHub Actions 云编译）
+# HONOR FUR-602 完整固件云编译（GitHub Actions）
 
-路由器：ImmortalWrt 24.10-SNAPSHOT（第三方 padavanonly 分支），内核 **6.6.133**，aarch64。
-目标：编译出与该内核 ABI 一致的 `nft_fullcone.ko`，装上后开启 fw4 原生全锥 NAT（`fullcone='1'`），不刷机、不写脚本。
+基于 **padavanonly/immortalwrt-mt798x-6.6 @ `openwrt-24.10-6.6`** 编译包含以下特性的 FUR-602 固件：
 
-## 为什么必须这样编
+- **闭源 mtwifi 驱动**（`kmod-mt_wifi`，与现固件一致，含 HNAT/WARP）
+- **CPU 降频**（内核 `ARM_MEDIATEK_CPUFREQ=y` + 全部 governor 已在 filogic 子目标默认开启；固件内带 `cpufreq` / `luci-app-cpufreq`）
+- **全锥形 NAT（nft fullcone）**：用户态补丁 padavanonly 已自带（libnftnl / nftables / firewall4），内核模块 `kmod-nft-fullcone` 由 `fullcone-nat-nftables/nft-fullcone` feed 补齐
+- **FUR-602 设备支持**：DTS + device 段来自 Yuzhii0718 fork，已把 `kmod-mt7915e` 改为 `kmod-mt_wifi`
 
-直接装官方 24.10.6 的 `kmod-nft-fullcone` 会失败：
+> 设计依据（已在线核实）：padavanonly `feeds.conf.default` 只挂标准 feed，**不含**全锥；其 `nft.mk` 里没有 `kmod-nft-fullcone`（官方 immortalwrt 24.10 同样不含模块），所以必须靠外部 feed 补内核模块，而用户态补丁已在主源 `package/*/patches/` 就位。
+
+## 目录结构
 
 ```
-module nft_fullcone: .gnu.linkonce.this_module section size must match
-the kernel's built struct module size at run time
+fur602-build/
+├── .github/workflows/build-fur602.yml   # 完整固件编译 workflow
+├── fur602-patches/
+│   ├── dts/mt7981b-honor-fur-602.dts     # FUR-602 设备树（来自 Yuzhii0718）
+│   ├── apply-device.py                   # 把设备定义注入 filogic.mk
+│   └── fur602.config                     # .config 种子（target/device/功能开关）
+├── kernel.config                         # 路由器现跑内核配置（参考/对照用）
+└── README.md
 ```
 
-vermagic 一样（都是 `6.6.133 SMP mod_unload aarch64`）但 `struct module` 布局不同 ——
-因为**内核 .config 不同**。解决办法：把路由器上正在跑的那份真实内核配置
-（`/proc/config.gz`，已导出为 `kernel.config`）覆盖编译时的 target kernel config，
-这样编出来的模块 ABI 与运行内核一致。
+## 一键推仓 + 触发编译
 
-## 用法
+需要你的 GitHub PAT（scope 勾 `repo` + `workflow`）：
 
 ```bash
-git init fur602-fullcone && cd fur602-fullcone
-# 放入 kernel.config 和 .github/workflows/build-nft-fullcone.yml
-git add -A && git commit -m "build nft_fullcone for FUR-602 6.6.133"
-gh repo create fur602-fullcone --public --source=. --push      # 或用网页建库后 push
-# 然后：仓库页面 → Actions → "Build nft_fullcone.ko..." → Run workflow
+GH_PAT=ghp_xxx bash push-and-build.sh
 ```
 
-跑完约 60~120 分钟（工具链 + 内核）。产物在 Artifacts：`nft_fullcone-6.6.133`
-（含 `nft_fullcone.ko` 和 `kmod-nft-fullcone_*.ipk`）。
+脚本会：① 用 PAT 在你的账号下建公开库 `fur602-firmware`；② 推 `main`；③
+推上去即触发 `Build FUR-602 firmware` workflow（也可在仓库 Actions 页手动 Run）。
 
-## 装到路由器
+## 产物
+
+`bin/targets/mediatek/filogic/` 下的 `*-sysupgrade.bin` 与 `*-factory.bin`（约 1.5–2.5 小时构建）。
+
+## 路由器侧刷写与验证
 
 ```sh
-# 1) 先试加载（干净失败也不会崩，最坏是 insmod 报错）
-insmod /tmp/nft_fullcone.ko && echo "LOAD OK"
-lsmod | grep fullcone
-dmesg | tail -5
+# 刷 sysupgrade（保留配置可加 -n 去掉以不保留）
+sysupgrade -v openwrt-mediatek-filogic-honor_fur-602-squashfs-sysupgrade.bin
 
-# 2) 确认 OK 再固化
-cp /tmp/nft_fullcone.ko /lib/modules/6.6.133/
-echo nft_fullcone > /etc/modules.d/nft-fullcone
-uci set firewall.@defaults[0].fullcone='1'
-uci commit firewall
-fw4 reload
-
-# 3) 验证
+# 验证全锥
+lsmod | grep nft_fullcone
+uci set firewall.@defaults[0].fullcone='1'; uci commit firewall; fw4 reload
 nft list ruleset | grep -i fullcone
+
+# 验证 cpufreq
+cpufreq-info            # 或 luci → 系统 → CPU 频率
 ```
 
-注意：**别对任何 fullcone 相关模块执行 rmmod**（`xt_FULLCONENAT` 的 rmmod 曾导致内核 panic 重启）。
-若 `insmod` 仍报 struct module size 不匹配，说明 config 仍未对齐，直接放弃，不要强加载。
+## 注意
+
+- 不要 `rmmod` 任何 fullcone 模块（`xt_FULLCONENAT` 的 rmmod 曾导致内核 panic 重启）。
+- 闭源 mtwifi 与现固件同源同分支，驱动版本匹配，刷后 Wi-Fi 行为与现固件一致。
+- 若构建报 `kmod-nft-fullcone` 依赖缺失，多半是 `NF_CONNTRACK_EVENTS` / `NF_CONNTRACK_CHAIN_EVENTS`
+  未开；workflow 已强制 `-e` 这两项为 y。
