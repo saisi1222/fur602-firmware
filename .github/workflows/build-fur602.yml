@@ -21,7 +21,19 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
             gettext git libncurses5-dev libssl-dev python3-setuptools rsync swig \
-            unzip zlib1g-dev file wget ccache
+            unzip zlib1g-dev file wget ccache \
+            texinfo ninja-build
+
+      - name: Free up disk space
+        run: |
+          # GitHub-hosted runner 默认剩余磁盘有限，OpenWrt 全量编译极易撑爆。
+          # 删除与编译无关的预装软件栈，腾出约 10GB。
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+                     /usr/share/swift /usr/local/.ghcup /opt/hostedtoolcache 2>/dev/null || true
+          sudo apt-get autoremove -y 2>/dev/null || true
+          sudo apt-get clean 2>/dev/null || true
+          echo "--- disk after cleanup ---"
+          df -h / /mnt 2>/dev/null || df -h /
 
       - name: Clone padavanonly base (openwrt-24.10-6.6)
         run: |
@@ -83,7 +95,9 @@ jobs:
 
       - name: Build firmware
         working-directory: padavanonly
-        run: make -j$(nproc) V=s
+        # 不开 V=s：verbose 日志会把 GitHub 8MB 日志上限撑爆导致真实报错被截断，
+        # 紧凑日志反而能看到 "ERROR: package/X failed to build" 这一行。
+        run: make -j$(nproc)
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
