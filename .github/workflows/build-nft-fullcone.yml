@@ -9,7 +9,7 @@ jobs:
     timeout-minutes: 340
 
     steps:
-      - name: Checkout (builder repo: kernel.config + this workflow)
+      - name: "Checkout - kernel.config + this workflow"
         uses: actions/checkout@v4
 
       - name: Show disk space
@@ -30,6 +30,18 @@ jobs:
         run: |
           git clone --depth 1 --branch v24.10.6 https://github.com/immortalwrt/immortalwrt owrt
           cd owrt && git log -1 --oneline
+
+      - name: Verify source kernel version (must be 6.6.133)
+        run: |
+          cd owrt
+          grep -E '^LINUX_VERSION-6.6' include/kernel-6.6 || true
+          grep -E '^(CONFIG_LINUX_6_6|CONFIG_DEFAULT_TARGET)=|LINUX_KERNEL_HASH' target/linux/mediatek/Makefile 2>/dev/null | head -3 || true
+          K=$(sed -n 's/^LINUX_VERSION-6\.6 *= *//p' include/kernel-6.6 | tr -d ' ')
+          echo "kernel 6.6 series suffix = $K"
+          if [ "$K" != ".133" ]; then
+            echo "::warning::source kernel is 6.6$K, NOT 6.6.133 - module vermagic will NOT match"
+          fi
+          ls package/network/utils/fullconenat-nft/
 
       - name: Feeds
         run: |
