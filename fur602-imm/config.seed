@@ -1,3 +1,5 @@
+# !! 仅作参考，工作流不会再用它：本文件缺少 CONFIG_MTK_* 无线 Kconfig，
+#    直接用它会编出「没有无线驱动」的固件，正式编译请用 fur602-imm/config.full。
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic=y
 CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_honor_fur-602=y
@@ -10,12 +12,12 @@ CONFIG_PACKAGE_luci-app-autoreboot=y
 CONFIG_PACKAGE_luci-app-firewall=y
 CONFIG_PACKAGE_luci=y
 
-# ---- 硬件加速（本源码无 kmod-mediatek_hnat 包，走 flowtable 硬件卸载，
-#      mediatek hw-offload 补丁见 target/linux/mediatek/patches-6.6/999-2735~2738）----
+
 CONFIG_PACKAGE_kmod-nft-offload=y
 
 # ---- 无线：本源码自带闭源 MTK（package/mtk/drivers/mt_wifi）；
-#      源码无 mt76 / kmod-mt7915e，故不可选 ----
+#      注意：kmod-mediatek_hnat 由源码 package/kernel/linux/modules/netdevices.mk 定义，
+#      不在 MTK feed 里，feed 24.10/patches-base 也无 0014-package-kernel-add-mtkhnat ----
 CONFIG_PACKAGE_kmod-mt_wifi=y
 CONFIG_PACKAGE_kmod-conninfra=y
 CONFIG_PACKAGE_kmod-warp=y

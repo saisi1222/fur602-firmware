@@ -47,11 +47,12 @@ jobs:
         working-directory: openwrt
         run: |
           set -x
-          echo "src-git mtk_openwrt_feed $MTK_FEED_OFFICIAL" >> feeds.conf.default
+          # 直接用 GitHub 镜像（git01.mediatek.com 在 Actions 内经常超时/不可达）
+          echo "src-git mtk_openwrt_feed $MTK_FEED_MIRROR" >> feeds.conf.default
           cat feeds.conf.default
           if ! timeout 900 ./scripts/feeds update -a; then
-            echo "[!] git01.mediatek.com unreachable -> fallback mirror"
-            sed -i "s|$MTK_FEED_OFFICIAL|$MTK_FEED_MIRROR|" feeds.conf.default
+            echo "[!] mirror failed -> fallback official"
+            sed -i "s|$MTK_FEED_MIRROR|$MTK_FEED_OFFICIAL|" feeds.conf.default
             ./scripts/feeds update -a
           fi
           ./scripts/feeds install -a || true
@@ -90,8 +91,9 @@ jobs:
             echo "[i] using pinned fur602-imm/config.full"
             cp ../fur602-imm/config.full .config
           else
-            echo "[i] using fur602-imm/config.seed"
-            cp ../fur602-imm/config.seed .config
+            echo "[FAIL] 缺少 fur602-imm/config.full（固定配置）。拒绝用 seed 编译："
+            echo "       它的 MTK 无线 Kconfig 不完整，会编出没有无线驱动的固件。"
+            exit 1
           fi
           make defconfig
           # 兜底：必须选中一个 libustream 变体（历史失败点）
@@ -102,6 +104,22 @@ jobs:
           fi
           echo "=== 关键项确认 ==="
           grep -E "CONFIG_TARGET_DEVICE|CONFIG_PACKAGE_kmod-(nft-fullcone|mediatek_hnat|mt_wifi)|libustream|zram-swap|autoreboot|luci-app-firewall|wifi-dats" .config || true
+          # 硬校验：缺一项就直接失败，避免白跑一小时
+          fail=0
+          for sym in \
+            "CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_honor_fur-602=y" \
+            "CONFIG_PACKAGE_kmod-mediatek_hnat=y" \
+            "CONFIG_PACKAGE_kmod-mt_wifi=y" \
+            "CONFIG_PACKAGE_kmod-nft-fullcone=y" \
+            "CONFIG_PACKAGE_zram-swap=y" \
+            "CONFIG_PACKAGE_luci-app-autoreboot=y" \
+            "CONFIG_PACKAGE_luci-app-firewall=y" \
+            "CONFIG_MTK_MT_WIFI=" \
+            "CONFIG_MTK_CHIP_MT7981=y" \
+            "CONFIG_MTK_FIRST_IF_MT7981=y" ; do
+            if ! grep -q "^${sym}" .config; then echo "[FAIL] 缺少关键配置: $sym"; fail=1; fi
+          done
+          [ "$fail" = "0" ] || exit 1
           cp .config ../config-final.txt
 
       - name: Build
@@ -109,6 +127,17 @@ jobs:
         run: |
           make -j$(nproc) download
           make -j$(nproc) || make -j1 V=s
+
+      - name: Verify built kmods (hnat + mt_wifi)
+        working-directory: openwrt
+        run: |
+          echo "=== 已生成的 kmod 包 ==="
+          find bin/targets -name "kmod-mediatek_hnat*.ipk" -o -name "kmod-mt_wifi*.ipk" -o -name "kmod-nft-fullcone*.ipk" | sort
+          fail=0
+          for k in kmod-mediatek_hnat kmod-mt_wifi kmod-nft-fullcone; do
+            if ! find bin/targets -name "${k}_*.ipk" | grep -q .; then echo "[FAIL] 未生成 $k"; fail=1; fi
+          done
+          [ "$fail" = "0" ] || exit 1
 
       - name: List images
         if: always()
