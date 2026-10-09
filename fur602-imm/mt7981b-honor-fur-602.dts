@@ -72,9 +72,6 @@
 		reg = <0>;
 		phy-mode = "2500base-x";
 
-		nvmem-cell-names = "mac-address";
-		nvmem-cells = <&macaddr_factory_4>;
-
 		fixed-link {
 			speed = <2500>;
 			full-duplex;
@@ -149,9 +146,6 @@
 						reg = <0x0 0x1000>;
 					};
 
-					macaddr_factory_4: macaddr@4 {
-						reg = <0x4 0x6>;
-					};
 				};
 			};
 
@@ -183,9 +177,6 @@
 		wan: port@0 {
 			reg = <0>;
 			label = "wan";
-
-			nvmem-cell-names = "mac-address";
-			nvmem-cells = <&macaddr_factory_4>;
 		};
 
 		port@1 {
