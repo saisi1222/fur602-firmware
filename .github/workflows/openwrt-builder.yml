@@ -58,14 +58,28 @@ jobs:
           ./scripts/feeds install -a || true
           ls -d feeds/mtk_openwrt_feed 2>/dev/null && ls feeds/mtk_openwrt_feed || echo "FEED MISSING"
           if [ -d ./feeds/mtk_openwrt_feed/24.10 ]; then
-            cp -af ./feeds/mtk_openwrt_feed/24.10/files/* . 2>/dev/null || true
+            # 关键（踩过的坑）：只拷 tools。
+            #   files/target 里带 files-6.6/arch/arm64/boot/dts/mediatek/mt7988d-rfb.dts，
+            #   它会覆盖内核树同名文件，导致源码自带补丁
+            #   target/linux/mediatek/patches-6.6/999-3027-dts-88d-option-type-2-support.patch
+            #   Hunk #1 FAILED -> target/linux 编译中断（run 37964085004 就是这个）。
+            #   files/package/mtk 也会覆盖源码自带的闭源 mt_wifi（源码 package/mtk 已有），
+            #   覆盖后 Kconfig 与 defconfig 对不上，无线驱动会消失。两者都不拷。
+            cp -af ./feeds/mtk_openwrt_feed/24.10/files/tools/. ./tools/ 2>/dev/null || true
+            echo "[i] copied: 24.10/files/tools -> tools/ (xxhash)"
             for file in $(find ./feeds/mtk_openwrt_feed/24.10/patches-base -name "*.patch" | sort); do
-              echo "  apply: $file"
-              patch -f -p1 -i "$file" || echo "  [warn] patch failed: $file"
+              if patch -p1 --dry-run --forward -i "$file" >/dev/null 2>&1; then
+                patch -p1 --forward -i "$file" >/dev/null && echo "  [ok]   $file" || echo "  [warn] $file"
+              else
+                echo "  [skip] cannot apply cleanly: $file"
+              fi
             done
           else
             echo "  [warn] feeds/mtk_openwrt_feed/24.10 not found"
           fi
+          # 删掉与 mt7981/602 无关、且易受 dts 版本影响的 mt7988d 补丁（只给 mt7988d-rfb.dts 加 pcie option_type）
+          rm -f target/linux/mediatek/patches-6.6/999-3027-dts-88d-option-type-2-support.patch
+          ls target/linux/mediatek/patches-6.6/ | grep -c "patch$" || true
           ./scripts/feeds install -a || true
 
       - name: Inject FUR-602 device support (DTS + device profile + network)
