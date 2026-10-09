@@ -97,7 +97,25 @@ jobs:
         working-directory: padavanonly
         # 不开 V=s：verbose 日志会把 GitHub 8MB 日志上限撑爆导致真实报错被截断，
         # 紧凑日志反而能看到 "ERROR: package/X failed to build" 这一行。
-        run: make -j$(nproc)
+        # 并行失败后自动串行重试一次：build_dir 已缓存，重试开销很小，
+        # 既能绕过 -j 在 package/index、package/install 阶段的偶发竞争，
+        # 又能在真失败时拿到干净的串行日志（写文件后只提取关键行，不撑爆日志上限）。
+        run: |
+          rc=0
+          make -j$(nproc) || rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "=== parallel build failed (exit $rc); retrying serially ==="
+            rc2=0
+            make -j1 V=s > /tmp/retry.log 2>&1 || rc2=$?
+            echo "=== serial retry exit=$rc2 ==="
+            if [ $rc2 -ne 0 ]; then
+              echo "===== last 150 lines of serial log ====="
+              tail -150 /tmp/retry.log || true
+              echo "===== key error lines ====="
+              grep -nE "error:|Error [0-9]|ERROR|Collected errors|Cannot install|conflict|satisfy|No space|Killed|Segmentation|missing depend|not found|undefined" /tmp/retry.log | tail -80 || true
+              exit 1
+            fi
+          fi
 
       - name: Diagnose failing package (on failure)
         if: failure()
@@ -110,10 +128,15 @@ jobs:
           if [ -n "$H" ]; then
             sed -n '/^struct nft_expr_ops {/,/^};/p' "$H" || true
           fi
-          # 2) 只重编失败包并开 V=s，快速暴露真实 gcc/内核 API 报错，避免整编一小时盲猜
-          echo "===== rebuild failing package with V=s ====="
+          echo "===== disk ====="
+          df -h / || true
+          # 2) 单包重编暴露 gcc 错误（包编译失败时最有效）
+          echo "===== rebuild nft-fullcone with V=s ====="
           make package/kernel/nft-fullcone/compile V=s 2>&1 | tail -120 || true
           make package/kernel/nft-fullcone/compile V=s 2>&1 | grep -iE "error:|undefined|\.c:[0-9]+:[0-9]+" | head -40 || true
+          # 3) 若已越过编译阶段，install 阶段的依赖缺失才是真凶，直接显式检查
+          echo "===== re-run package/install to expose dependency errors ====="
+          make package/install V=s 2>&1 | tail -160 || true
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
