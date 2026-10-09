@@ -20,6 +20,8 @@ CONFIG_PACKAGE_kmod-mt_wifi=y
 CONFIG_PACKAGE_kmod-conninfra=y
 CONFIG_PACKAGE_kmod-warp=y
 CONFIG_PACKAGE_mtwifi-cfg=y
+CONFIG_PACKAGE_wifi-profile=y
+CONFIG_PACKAGE_wifi-dats=y
 CONFIG_PACKAGE_wifi-scripts=y
 
 # ---- 防缺包：上次失败于 opkg 装不上 libustream-openssl20201210 ----

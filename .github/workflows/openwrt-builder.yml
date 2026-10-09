@@ -1,0 +1,142 @@
+name: OpenWrt Builder
+
+# 用法：
+#   - 换源码：只改下面 env 的 REPO_URL / REPO_BRANCH
+#   - 配置：优先用 fur602-imm/config.full（固定 .config，避免 Actions 内推断不一致）；
+#           不存在时用 fur602-imm/config.seed 生成，并把最终 .config 作为 artifact 回传
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/openwrt-builder.yml'
+      - 'fur602-imm/**'
+
+env:
+  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
+  REPO_BRANCH: openwrt-24.10-6.6
+  MTK_FEED_OFFICIAL: https://git01.mediatek.com/openwrt/feeds/mtk-openwrt-feeds
+  MTK_FEED_MIRROR: https://github.com/GainStrongService/mtk-openwrt-feeds.git
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout build materials
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/lib/jvm 2>/dev/null || true
+          sudo apt-get clean || true
+          df -h || true
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang flex bison g++ gawk gcc-multilib g++-multilib \
+            gettext git libncurses-dev libssl-dev python3-setuptools rsync swig unzip zlib1g-dev \
+            file wget device-tree-compiler
+
+      - name: Clone source (${{ env.REPO_BRANCH }})
+        run: |
+          git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" openwrt
+          cd openwrt && git log -1 --format='HEAD=%H%ndate=%ad%nsubject=%s'
+
+      - name: Add MTK feed + 24.10 patches (kmod-mediatek_hnat 等)
+        working-directory: openwrt
+        run: |
+          set -x
+          echo "src-git mtk_openwrt_feed $MTK_FEED_OFFICIAL" >> feeds.conf.default
+          cat feeds.conf.default
+          if ! timeout 900 ./scripts/feeds update -a; then
+            echo "[!] git01.mediatek.com unreachable -> fallback mirror"
+            sed -i "s|$MTK_FEED_OFFICIAL|$MTK_FEED_MIRROR|" feeds.conf.default
+            ./scripts/feeds update -a
+          fi
+          ./scripts/feeds install -a || true
+          ls -d feeds/mtk_openwrt_feed 2>/dev/null && ls feeds/mtk_openwrt_feed || echo "FEED MISSING"
+          if [ -d ./feeds/mtk_openwrt_feed/24.10 ]; then
+            cp -af ./feeds/mtk_openwrt_feed/24.10/files/* . 2>/dev/null || true
+            for file in $(find ./feeds/mtk_openwrt_feed/24.10/patches-base -name "*.patch" | sort); do
+              echo "  apply: $file"
+              patch -f -p1 -i "$file" || echo "  [warn] patch failed: $file"
+            done
+          else
+            echo "  [warn] feeds/mtk_openwrt_feed/24.10 not found"
+          fi
+          ./scripts/feeds install -a || true
+
+      - name: Inject FUR-602 device support (DTS + device profile + network)
+        run: python3 fur602-imm/inject_device.py openwrt
+
+      - name: Add nft-fullcone package (kernel 6.6 fixed)
+        run: |
+          mkdir -p openwrt/package/nft-fullcone
+          cp -r fur602-imm/package/nft-fullcone/. openwrt/package/nft-fullcone/
+          ls -l openwrt/package/nft-fullcone/
+
+      - name: Add uci-defaults (LAN 192.168.110.1 + Wifi + IPv6)
+        run: |
+          mkdir -p openwrt/files
+          cp -r fur602-imm/files/. openwrt/files/
+          chmod +x openwrt/files/etc/uci-defaults/*
+          ls -l openwrt/files/etc/uci-defaults/
+
+      - name: Load config (.config)
+        working-directory: openwrt
+        run: |
+          if [ -f ../fur602-imm/config.full ]; then
+            echo "[i] using pinned fur602-imm/config.full"
+            cp ../fur602-imm/config.full .config
+          else
+            echo "[i] using fur602-imm/config.seed"
+            cp ../fur602-imm/config.seed .config
+          fi
+          make defconfig
+          # 兜底：必须选中一个 libustream 变体（历史失败点）
+          if ! grep -q "^CONFIG_PACKAGE_libustream" .config; then
+            echo "[!] no libustream selected -> force openssl variant"
+            echo "CONFIG_PACKAGE_libustream-openssl20201210=y" >> .config
+            make defconfig
+          fi
+          echo "=== 关键项确认 ==="
+          grep -E "CONFIG_TARGET_DEVICE|CONFIG_PACKAGE_kmod-(nft-fullcone|mediatek_hnat|mt_wifi)|libustream|zram-swap|autoreboot|luci-app-firewall|wifi-dats" .config || true
+          cp .config ../config-final.txt
+
+      - name: Build
+        working-directory: openwrt
+        run: |
+          make -j$(nproc) download
+          make -j$(nproc) || make -j1 V=s
+
+      - name: List images
+        if: always()
+        working-directory: openwrt
+        run: |
+          ls -la bin/targets/mediatek/filogic/ 2>/dev/null || true
+
+      - name: Upload images
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fur602-immortalwrt
+          path: openwrt/bin/targets/mediatek/filogic/*honor_fur-602*.bin
+          if-no-files-found: warn
+
+      - name: Upload final .config
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: config-final
+          path: config-final.txt
+          if-no-files-found: warn
+
+      - name: Diagnose on failure
+        if: failure()
+        working-directory: openwrt
+        run: |
+          echo "=== 磁盘 ==="; df -h || true
+          echo "=== 最近构建日志 ==="
+          ls -la logs 2>/dev/null || true
+          tail -n 150 logs/*.log 2>/dev/null || true
