@@ -49,6 +49,10 @@ jobs:
           set -x
           # 直接用 GitHub 镜像（git01.mediatek.com 在 Actions 内经常超时/不可达）
           echo "src-git mtk_openwrt_feed $MTK_FEED_MIRROR" >> feeds.conf.default
+          # mosdns（双栈优先 IPv4 / 纯 v6 可达）：padavanonly 自带 4 个 feeds 均无此包，必须单独加
+          #   sbwml/luci-app-mosdns 的 v5 分支同时提供 mosdns / luci-app-mosdns / luci-i18n-mosdns-zh-cn（i18n 由 po 自动生成）
+          #   DEPENDS 仅 $(GO_ARCH_DEPENDS)+ca-bundle，无 v2ray-geodata 硬依赖；openwrt-24.10 自带 golang 1.23.12 >= 要求的 1.21，无需换 golang feed
+          echo "src-git mosdns https://github.com/sbwml/luci-app-mosdns.git;v5" >> feeds.conf.default
           cat feeds.conf.default
           if ! timeout 900 ./scripts/feeds update -a; then
             echo "[!] mirror failed -> fallback official"
@@ -139,6 +143,8 @@ jobs:
             "CONFIG_PACKAGE_zram-swap=y" \
             "CONFIG_PACKAGE_luci-app-autoreboot=y" \
             "CONFIG_PACKAGE_luci-app-firewall=y" \
+            "CONFIG_PACKAGE_mosdns=y" \
+            "CONFIG_PACKAGE_luci-app-mosdns=y" \
             "CONFIG_MTK_MT_WIFI=" \
             "CONFIG_MTK_CHIP_MT7981=y" \
             "CONFIG_MTK_FIRST_IF_MT7981=y" ; do

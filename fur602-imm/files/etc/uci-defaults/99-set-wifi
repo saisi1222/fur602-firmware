@@ -1,6 +1,8 @@
 #!/bin/sh
 # 首次启动配置无线（闭源 mtwifi 驱动：设备名形如 MT7981_1_1 / MT7981_1_2，phy 为 ra0 / rax0）
-# 双频默认开启、开放无密码、SSID FUR602_2G / FUR602_5G
+# 双频默认开启、开放无密码（首次启动便于接入配置）、SSID 1111 / 1111-5G
+# 5G 用 HE160 @ ch36（用户环境可跑 160MHz，速率最高 2402Mbps；含 DFS 信道 52-64 需 CAC，国内偶有雷达事件断流属正常）
+# 2.4G 用 HE40 @ auto（noscan=1 强制 40MHz 不降回 20，国内拥挤环境干扰代价用户已知晓、选择保持）
 
 [ -s /etc/config/wireless ] || wifi config >/dev/null 2>&1
 
@@ -12,18 +14,28 @@ for d in $(uci show wireless 2>/dev/null | sed -n "s/^wireless\.\([^.=]*\)=wifi-
 	uci -q set wireless.$d.disabled='0' 2>/dev/null
 
 	band=$(uci -q get wireless.$d.band)
+	case "$band" in
+		2g)
+			uci -q set wireless.$d.channel='auto'
+			uci -q set wireless.$d.htmode='HE40'
+			uci -q set wireless.$d.noscan='1'
+			;;
+		5g)
+			uci -q set wireless.$d.channel='36'
+			uci -q set wireless.$d.htmode='HE160'
+			;;
+	esac
 
 	# 找到挂在该设备下的 wifi-iface
 	for s in $(uci show wireless 2>/dev/null | sed -n "s/^wireless\.\([^.=]*\)\.device='$d'$/\1/p"); do
 		uci -q set wireless.$s.disabled='0'
 		uci -q set wireless.$s.network='lan'
 		uci -q set wireless.$s.mode='ap'
-		case "$band" in
-			2g) uci -q set wireless.$s.ssid='FUR602_2G' ;;
-			5g) uci -q set wireless.$s.ssid='FUR602_5G' ;;
-		esac
 		uci -q set wireless.$s.encryption='none'
-		uci -q set wireless.$s.key=''
+		case "$band" in
+			2g) uci -q set wireless.$s.ssid='1111' ;;
+			5g) uci -q set wireless.$s.ssid='1111-5G' ;;
+		esac
 	done
 done
 

@@ -1,0 +1,18 @@
+#!/bin/sh
+# 拨号固化：PPPoE 参数（不含账号密码，刷机后手动填 credentials 即自动拨）
+# 位置不写明文凭证，避免进固件/仓库泄露
+
+# ---- WAN：PPPoE + IPv6 + 清 ISP DNS + LCP 主动探测 ----
+uci -q set network.wan.proto='pppoe'
+uci -q set network.wan.ipv6='1'
+uci -q set network.wan.peerdns='0'
+uci -q set network.wan.keepalive='1 5'
+
+# ---- WAN6：DHCPv6 委派（双栈 IPv6）----
+uci -q set network.wan_6.proto='dhcpv6'
+uci -q set network.wan_6.device='@wan'
+uci -q set network.wan_6.reqaddress='try'
+uci -q set network.wan_6.reqprefix='auto'
+
+uci commit network
+exit 0

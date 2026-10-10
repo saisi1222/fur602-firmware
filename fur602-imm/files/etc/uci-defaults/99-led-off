@@ -1,0 +1,13 @@
+#!/bin/sh
+# 关闭 HONOR FUR-602 状态指示灯(green:status / red:status)
+# trigger=none + default=0 -> led init(S96) 在开机 done 之后写入 brightness=0，最终保持灭
+for s in green:status red:status; do
+	n=$(echo "$s" | tr ':' '_')
+	uci -q delete system.led_$n
+	uci -q set system.led_$n=led
+	uci -q set system.led_$n.sysfs="$s"
+	uci -q set system.led_$n.trigger='none'
+	uci -q set system.led_$n.default='0'
+done
+uci commit system
+exit 0
