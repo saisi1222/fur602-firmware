@@ -8,11 +8,14 @@ uci -q set network.wan.ipv6='1'
 uci -q set network.wan.peerdns='0'
 uci -q set network.wan.keepalive='1 5'
 
-# ---- WAN6：DHCPv6 委派（双栈 IPv6）----
-uci -q set network.wan_6.proto='dhcpv6'
-uci -q set network.wan_6.device='@wan'
-uci -q set network.wan_6.reqaddress='try'
-uci -q set network.wan_6.reqprefix='auto'
+# ---- WAN6：DHCPv6 委派（双栈 IPv6）
+# 接口名必须是 wan6（无下划线）！原 wan_6(下划线)命名错误：
+# netifd 按 wan.ipv6='1' 自动建的是 wan6，脚本又用错名建 wan_6，
+# 两者冲突/无人引用 → 上游拿不到 IPv6。这里用正确名 wan6。
+uci -q set network.wan6.proto='dhcpv6'
+uci -q set network.wan6.device='@wan'
+uci -q set network.wan6.reqaddress='try'
+uci -q set network.wan6.reqprefix='auto'
 
 uci commit network
 exit 0
