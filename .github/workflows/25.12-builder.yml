@@ -76,6 +76,8 @@ jobs:
             "CONFIG_PACKAGE_mt7981-wo-firmware=y" \
             "CONFIG_PACKAGE_kmod-nft-offload=y" \
             "CONFIG_PACKAGE_kmod-nft-fullcone=y" \
+            "CONFIG_PACKAGE_dnsmasq-full=y" \
+            "CONFIG_PACKAGE_dropbear=y" \
             "CONFIG_PACKAGE_zram-swap=y" \
             "CONFIG_PACKAGE_luci-app-autoreboot=y" \
             "CONFIG_PACKAGE_luci-app-firewall=y" ; do
