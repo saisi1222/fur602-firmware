@@ -9,10 +9,10 @@ uci -q set network.wan.peerdns='0'
 uci -q set network.wan.keepalive='1 5'
 
 # ---- WAN6：DHCPv6 委派（双栈 IPv6）----
-uci -q set network.wan_6.proto='dhcpv6'
-uci -q set network.wan_6.device='@wan'
-uci -q set network.wan_6.reqaddress='try'
-uci -q set network.wan_6.reqprefix='auto'
+uci -q set network.wan6.proto='dhcpv6'
+uci -q set network.wan6.device='@wan'
+uci -q set network.wan6.reqaddress='try'
+uci -q set network.wan6.reqprefix='auto'
 
 uci commit network
 exit 0
