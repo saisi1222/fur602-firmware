@@ -1,0 +1,13 @@
+#!/bin/sh
+# DNS 上游：dnsmasq 直转腾讯/阿里（peerdns=0 时不设这个就没有上游），IPv4 + IPv6 双栈
+uci -q del_list dhcp.@dnsmasq[0].server='119.29.29.29'
+uci -q del_list dhcp.@dnsmasq[0].server='223.5.5.5'
+uci -q del_list dhcp.@dnsmasq[0].server='2402:4e00::'
+uci -q del_list dhcp.@dnsmasq[0].server='2400:3200::1'
+uci -q add_list dhcp.@dnsmasq[0].server='119.29.29.29'
+uci -q add_list dhcp.@dnsmasq[0].server='223.5.5.5'
+uci -q add_list dhcp.@dnsmasq[0].server='2402:4e00::'
+uci -q add_list dhcp.@dnsmasq[0].server='2400:3200::1'
+uci -q set dhcp.@dnsmasq[0].noresolv='1'
+uci -q commit dhcp
+exit 0
