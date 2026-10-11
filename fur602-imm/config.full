@@ -274,10 +274,6 @@ CONFIG_PACKAGE_luci-app-firewall=y
 CONFIG_PACKAGE_libustream-openssl20201210=y
 CONFIG_PACKAGE_wpad-openssl=y
 
-# ---- DNS：mosdns 双栈优先 IPv4（_prefer_ipv4 仅拦双栈 AAAA，纯 v6 照常可达） ----
-CONFIG_PACKAGE_mosdns=y
-CONFIG_PACKAGE_luci-app-mosdns=y
-CONFIG_PACKAGE_luci-i18n-mosdns-zh-cn=y
 
 # ---- 明确排除 ----
 # CONFIG_PACKAGE_luci-app-turboacc-mtk is not set
