@@ -1,23 +1,15 @@
 #!/bin/sh
-# 拨号固化：PPPoE 参数（不含账号密码，刷机后手动填 credentials 即自动拨）
-# 位置不写明文凭证，避免进固件/仓库泄露
-
-# ---- WAN：PPPoE + IPv6 + 清 ISP DNS + LCP 主动探测 ----
+# PPPoE 固化（不含账号密码，刷机后手动填即拨）；IPv6 双栈
 uci -q set network.wan.proto='pppoe'
 uci -q set network.wan.ipv6='1'
 uci -q set network.wan.peerdns='0'
 uci -q set network.wan.keepalive='1 5'
-
-# ---- WAN6：DHCPv6 委派（双栈 IPv6）----
+# wan6：DHCPv6-PD。reqprefix 显式 60（auto 在本版= -P0 不请求）；
+# accept_ra=2（forwarding 开启时内核默认拒收 RA，拿不到 v6 默认路由）
 uci -q set network.wan6.proto='dhcpv6'
 uci -q set network.wan6.device='@wan'
 uci -q set network.wan6.reqaddress='try'
-# reqprefix='60'：主动向 ISP 请求 /60 前缀委派，供 LAN(br-lan) 下发 IPv6
-# （auto 在本版会解析成 -P0 不请求，必须显式写长度）
 uci -q set network.wan6.reqprefix='60'
-# accept_ra='2'：路由器开了 forwarding 默认 accept_ra=0，内核会拒收上游 RA
-# 导致拿不到 IPv6 默认路由；设 2 允许在 forwarding 下仍接收 RA 默认路由
 uci -q set network.wan6.accept_ra='2'
-
 uci commit network
 exit 0
