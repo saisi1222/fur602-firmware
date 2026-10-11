@@ -1,0 +1,13 @@
+#!/bin/sh
+# 完整 IPv6：移除 FD 私有地址（ULA），只保留运营商下发的公网 IPv6
+uci -q delete network.globals.ula_prefix
+uci -q set network.globals.ula_prefix=''
+uci commit network
+
+# LAN 侧 IPv6 保持由 odhcpd 正常通告（SLAAC + DHCPv6）
+uci -q set dhcp.lan.dhcpv6='server'
+uci -q set dhcp.lan.ra='server'
+uci -q set dhcp.lan.ra_slaac='1'
+uci commit dhcp
+
+exit 0

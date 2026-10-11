@@ -1,0 +1,18 @@
+#!/bin/sh
+# FUR-602：eqos MTK 硬件 QoS（smarthqos）编译默认开启
+# smarthqos=1 走 HNAT QDMA 硬件队列，零 CPU、不伤已开的 HNAT 加速；
+# 与你保留的全锥形/HNAT 一条路线，不打架。
+#
+# ⚠️ download/upload 是 eqos 的全局限速值(Mbit/s)，且“不能为 0”：
+#    init.d 里 `eqos start $dl $up` 无条件建 tc HTB，rate=${dl}mbit，
+#    若 dl=0 会变成 rate 0mbit 把下行堵死；同时 smarthqos 模式下
+#    download/upload=0 会跳过硬件 QDMA 队列写入（反而没优先级调度）。
+#    所以这里填远大于实际线速的 10000M(10G)：tc HTB 不构成瓶颈 = 不硬限速，
+#    真正的优先级调度由 smarthqos 的 HNAT QDMA 硬件队列负责。
+#    → 结论：仅做硬件优先级调度、不硬限速。
+uci -q set eqos.config.enabled='1'
+uci -q set eqos.config.smarthqos='1'
+uci -q set eqos.config.download='10000'
+uci -q set eqos.config.upload='10000'
+uci commit eqos
+exit 0
