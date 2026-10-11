@@ -2,7 +2,7 @@ name: OpenWrt 25.12 Builder (FUR-602)
 
 # 用法：
 #   - 源码：官方 immortalwrt/immortalwrt @ openwrt-25.12（kernel 6.12，开源 mt76 驱动）
-#   - 配置：fur602-2512/config.seed（24.10 配置去闭源/6.6专属 + 开源 MT7981 驱动 + kmod-nft-offload），CI 内 make defconfig 解析
+#   - 配置：fur602-2512/config.seed（24.10 配置去闭源/6.6专属 + 开源 MT7981 驱动 + kmod-nft-offload + kmod-nft-fullcone），CI 内 make defconfig 解析
 #   - 触发：push 到 25.12 分支，或手动 workflow_dispatch
 on:
   workflow_dispatch:
@@ -67,7 +67,7 @@ jobs:
             make defconfig
           fi
           echo "=== 关键项确认 ==="
-          grep -E "CONFIG_TARGET_DEVICE|CONFIG_PACKAGE_kmod-mt7915e|CONFIG_PACKAGE_kmod-mt7981-firmware|CONFIG_PACKAGE_kmod-nft-offload|zram-swap|luci-app-firewall" .config || true
+          grep -E "CONFIG_TARGET_DEVICE|CONFIG_PACKAGE_kmod-mt7915e|CONFIG_PACKAGE_kmod-mt7981-firmware|CONFIG_PACKAGE_kmod-nft-offload|CONFIG_PACKAGE_kmod-nft-fullcone|zram-swap|luci-app-firewall" .config || true
           fail=0
           for sym in \
             "CONFIG_TARGET_DEVICE_mediatek_filogic_DEVICE_honor_fur-602=y" \
@@ -75,6 +75,7 @@ jobs:
             "CONFIG_PACKAGE_kmod-mt7981-firmware=y" \
             "CONFIG_PACKAGE_mt7981-wo-firmware=y" \
             "CONFIG_PACKAGE_kmod-nft-offload=y" \
+            "CONFIG_PACKAGE_kmod-nft-fullcone=y" \
             "CONFIG_PACKAGE_zram-swap=y" \
             "CONFIG_PACKAGE_luci-app-autoreboot=y" \
             "CONFIG_PACKAGE_luci-app-firewall=y" ; do
