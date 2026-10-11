@@ -1,6 +1,6 @@
 #!/bin/sh
 # IPv6：去掉 ULA 私有前缀，LAN 由 odhcpd 正常通告 SLAAC + DHCPv6
-uci -q set network.globals.ula_prefix=''
+uci -q delete network.globals.ula_prefix
 uci -q set dhcp.lan.dhcpv6='server'
 uci -q set dhcp.lan.ra='server'
 uci -q set dhcp.lan.ra_slaac='1'

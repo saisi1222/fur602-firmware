@@ -1,4 +1,8 @@
 #!/bin/sh
-uci set network.lan.ipaddr='192.168.110.1'
+# LAN IP 固化 —— 25.12 专用写法
+# 25.12 官方 config_generate 生成的是 list ipaddr + CIDR（add_list network.lan.ipaddr='192.168.1.1/24'）；
+# 24.10 及以前的 option ipaddr + netmask 分离写法在 25.12 会使 netifd 解析不出地址（LAN 无 IPv4，DHCP 失效）。
+uci -q del_list network.lan.ipaddr='192.168.1.1/24'
+uci -q add_list network.lan.ipaddr='192.168.110.1/24'
 uci commit network
 exit 0
