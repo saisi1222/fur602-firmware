@@ -34,7 +34,7 @@ for d in $(uci show wireless 2>/dev/null | sed -n "s/^wireless\.\([^.=]*\)=wifi-
 		uci -q set wireless.$s.encryption='none'
 		case "$band" in
 			2g) uci -q set wireless.$s.ssid='1111' ;;
-			5g) uci -q set wireless.$s.ssid='1111-5G' ;;
+			5g) uci -q set wireless.$s.ssid='1111_5G' ;;
 		esac
 	done
 done
