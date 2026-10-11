@@ -15,7 +15,12 @@ uci -q set network.wan.keepalive='1 5'
 uci -q set network.wan6.proto='dhcpv6'
 uci -q set network.wan6.device='@wan'
 uci -q set network.wan6.reqaddress='try'
-uci -q set network.wan6.reqprefix='auto'
+# reqprefix='60'：主动向 ISP 请求 /60 前缀委派，供 LAN(br-lan) 下发 IPv6
+# （auto 在本版会解析成 -P0 不请求，必须显式写长度）
+uci -q set network.wan6.reqprefix='60'
+# accept_ra='2'：路由器开了 forwarding 默认 accept_ra=0，内核会拒收上游 RA
+# 导致拿不到 IPv6 默认路由；设 2 允许在 forwarding 下仍接收 RA 默认路由
+uci -q set network.wan6.accept_ra='2'
 
 uci commit network
 exit 0
