@@ -5,6 +5,11 @@
 # 只改中断调度，不动包路径，硬件 PPE 分载(HW_OFFLOAD)不受影响。
 # 每次开机执行（uci-defaults 只在刷机首启跑一次，重启不重跑，故放 rc.local）。
 
+# --- 0. 禁用镜像默认启用的 packet_steering ---
+# 它与下方 RPS 调优重复下发 rps_cpus，留它只会覆盖我们的精确设定。
+# 运行机已 disable；这里每次开机再确保一次，刷机自愈。
+/etc/init.d/packet_steering disable 2>/dev/null
+
 # --- 1. 以太网硬中断亲和 ---
 # 76/77 = 15100000.ethernet（交换机 CPU 口收发，路由流量主战场）-> CPU1
 for irq in 76 77; do

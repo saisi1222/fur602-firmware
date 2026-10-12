@@ -1,0 +1,46 @@
+#!/bin/sh
+# FUR-602 24.10.6：无线固化（SSID / 频宽 / BSS 着色 / 5G MU-MIMO 波束成形 / airtime fairness）
+#
+# 设备以无线为主，故把无线侧也固化进镜像，刷机即自愈。
+# 参考真机已验证状态（24.10.6 r33869，开源 mt76 + WED + PPE 硬件分载）：
+#   - 5G 跑 HE160（channel 36 非 DFS 信道，稳）；2.4G 配 HE40 但驱动在拥挤
+#     环境自动降到 HE20（更稳，不动频宽，维持原行为）。
+#   - BSS 着色（he_bss_color）做 802.11ax 空间复用，降低同频干扰；
+#     5G 开 MU-MIMO 波束成形（mu_beamformer）+ 上行 OFDMA（he_ul_onenable）
+#     提升多客户端并发吞吐。皆为 hostapd 标准选项，对老客户端无副作用。
+#   - airtimefairness=1：防慢速/老设备（IoT 等）占满空口拖垮全场。
+#     注意 MT7981 的 WED 只加速 5G，2.4G 不受 WED 接管、走 mac80211 调度，
+#     故 2.4G 开此项是真正生效的一档；5G 因 WED 接管基本不生效但无害。
+#   - country CN + txpower 17 合规；cell_density 0（不做高密度优化）。
+
+# --- 2.4G (radio0) ---
+uci -q set wireless.radio0.country='CN'
+uci -q set wireless.radio0.txpower='17'
+uci -q set wireless.radio0.cell_density='0'
+uci -q set wireless.radio0.channel='auto'
+uci -q set wireless.radio0.htmode='HE40'
+uci -q set wireless.radio0.he_bss_color='1'
+uci -q set wireless.radio0.airtimefairness='1'
+
+# --- 5G (radio1) ---
+uci -q set wireless.radio1.country='CN'
+uci -q set wireless.radio1.txpower='17'
+uci -q set wireless.radio1.cell_density='0'
+uci -q set wireless.radio1.channel='36'
+uci -q set wireless.radio1.htmode='HE160'
+uci -q set wireless.radio1.mu_beamformer='1'
+uci -q set wireless.radio1.he_bss_color='1'
+uci -q set wireless.radio1.he_ul_onenable='1'
+uci -q set wireless.radio1.airtimefairness='1'
+
+# --- 接口：SSID / 加密 ---
+uci -q set wireless.default_radio0.ssid='1111'
+uci -q set wireless.default_radio0.encryption='psk2'
+uci -q set wireless.default_radio0.key=''
+
+uci -q set wireless.default_radio1.ssid='1111_5G'
+uci -q set wireless.default_radio1.encryption='psk2'
+uci -q set wireless.default_radio1.key=''
+
+uci commit wireless
+exit 0

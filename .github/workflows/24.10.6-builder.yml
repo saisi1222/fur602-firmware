@@ -3,13 +3,13 @@ name: OpenWrt 24.10.6 Builder (FUR-602)
 # 用法：
 #   - 源码：官方 immortalwrt/immortalwrt @ tag v24.10.6（kernel 6.6，开源 mt76 + 主线 mtk_ppe PPE + WED）
 #   - 配置：fur602-2410-6/config.seed（24.10 配置去闭源/6.6专属 + 开源 MT7981 驱动 + kmod-nft-offload + kmod-nft-fullcone），CI 内 make defconfig 解析
-#   - 触发：push 到 25.12 分支，或手动 workflow_dispatch
+#   - 触发：push 到 24.10.6 分支（改动 fur602-2410-6/**），或手动 workflow_dispatch
 on:
   workflow_dispatch:
   push:
     branches: [24.10.6]
     paths:
-      - '.github/workflows/25.12-builder.yml'
+      - '.github/workflows/24.10.6-builder.yml'
       - 'fur602-2410-6/**'
 
 env:
@@ -79,7 +79,7 @@ jobs:
             "CONFIG_PACKAGE_dnsmasq-full=y" \
             "CONFIG_PACKAGE_dropbear=y" \
             "CONFIG_PACKAGE_zram-swap=y" \
-            "CONFIG_PACKAGE_luci-app-autoreboot=y" \
+            # luci-app-autoreboot 已剔除（无排程即空转轮询守护），故不再校验
             "CONFIG_PACKAGE_luci-app-firewall=y" ; do
             if ! grep -q "^${sym}" .config; then echo "[FAIL] 缺少关键配置: $sym"; fail=1; fi
           done
