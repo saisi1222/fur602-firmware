@@ -1,0 +1,33 @@
+#!/bin/sh
+# FUR-602 网络中断优化（MT7981B 双核 A53）
+# 目的：把交换机 CPU 口硬中断钉在 CPU1，软件收包 RPS 也走 CPU1；
+#       无线 AP 接口 RPS 走 CPU0，避免单核软中断打满影响转发/延迟。
+# 只改中断调度，不动包路径，硬件 PPE 分载(HW_OFFLOAD)不受影响。
+# 每次开机执行（uci-defaults 只在刷机首启跑一次，重启不重跑，故放 rc.local）。
+
+# --- 1. 以太网硬中断亲和 ---
+# 76/77 = 15100000.ethernet（交换机 CPU 口收发，路由流量主战场）-> CPU1
+for irq in 76 77; do
+    [ -f /proc/irq/$irq/smp_affinity_list ] && echo 1 > /proc/irq/$irq/smp_affinity_list 2>/dev/null
+done
+# 87 = mtk_eth（PPE 分发）-> CPU0，跟 76/77 错开
+[ -f /proc/irq/87/smp_affinity_list ] && echo 0 > /proc/irq/87/smp_affinity_list 2>/dev/null
+
+# --- 2. RPS（软件收包分摊）---
+# 有线/LAN 侧走 CPU1（与硬中断同核，缓存热）
+for iface in br-lan lan1 lan2 lan3 wan pppoe-wan eth0; do
+    for q in /sys/class/net/$iface/queues/rx-*; do
+        [ -w "$q/rps_cpus" ] && echo 2 > "$q/rps_cpus" 2>/dev/null
+    done
+done
+# 无线侧走 CPU0
+for iface in phy0-ap0 phy1-ap0; do
+    for q in /sys/class/net/$iface/queues/rx-*; do
+        [ -w "$q/rps_cpus" ] && echo 1 > "$q/rps_cpus" 2>/dev/null
+    done
+done
+
+# --- 3. 清掉内核 6.6 已删除的 sysctl（无害，仅消除启动 warning）---
+sed -i '/nf_conntrack_helper=1/d' /etc/sysctl.d/11-nf-conntrack.conf 2>/dev/null
+
+exit 0
