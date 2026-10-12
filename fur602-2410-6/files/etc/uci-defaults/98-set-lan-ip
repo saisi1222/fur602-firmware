@@ -1,0 +1,8 @@
+#!/bin/sh
+# LAN IP 固化 —— 24.10.6 专用写法
+# 24.10.6 的 config_generate 仍是 option ipaddr + option netmask 分离式
+# （25.12 才改成 list ipaddr + CIDR）。这里必须用旧写法，否则 LAN 无 IPv4、DHCP 全废。
+uci -q set network.lan.ipaddr='192.168.110.1'
+uci -q set network.lan.netmask='255.255.255.0'
+uci commit network
+exit 0

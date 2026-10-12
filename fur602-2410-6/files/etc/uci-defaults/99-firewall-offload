@@ -1,0 +1,20 @@
+#!/bin/sh
+# FUR-602 24.10.6：全锥形 NAT + 硬件加速（nft flowtable -> mtk_ppe / PPE）+ WED
+#
+# 1) 流量分载：flow_offloading=1 建软件快速路径；flow_offloading_hw=1 交给
+#    MT7981 的 PPE( Packet Processing Engine，主线的 mtk_ppe 驱动) 做硬件转发。
+#    依赖 kmod-nft-offload（官方包，已在 config.seed 编入）。
+uci -q set firewall.@defaults[0].flow_offloading='1'
+uci -q set firewall.@defaults[0].flow_offloading_hw='1'
+
+# 2) 全锥形 NAT：官方 ImmortalWrt 已自带
+#      package/network/utils/fullconenat-nft  -> kmod-nft-fullcone
+#      package/network/config/firewall4/patches/001-firewall4-add-support-for-fullcone-nat.patch
+#    所以直接用 defaults.fullcone 开关，不要再自己塞一份 nft-fullcone 包（会与
+#    官方打过补丁的 nftables/libnftnl 冲突）。
+#    注意官方包说明：fullcone 只对 UDP 有实际意义，TCP 等同 MASQUERADE。
+uci -q set firewall.@defaults[0].fullcone='1'
+uci -q set firewall.@defaults[0].fullcone6='0'
+
+uci commit firewall
+exit 0

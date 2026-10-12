@@ -1,0 +1,6 @@
+#!/bin/sh
+# DHCP 分配范围 2-254（.1 留给路由自己）
+uci -q set dhcp.lan.start='2'
+uci -q set dhcp.lan.limit='253'
+uci -q commit dhcp
+exit 0
